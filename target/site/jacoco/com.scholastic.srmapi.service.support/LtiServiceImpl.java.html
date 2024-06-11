@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LtiServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.service.support</a> &gt; <span class="el_source">LtiServiceImpl.java</span></div><h1>LtiServiceImpl.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.service.support;
+
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.servlet.http.HttpServletRequest;
+
+import com.scholastic.srmapi.model.User;
+import com.scholastic.srmapi.model.UserLoginSession;
+import com.scholastic.srmapi.repository.UserLoginSessionRepository;
+import org.apache.commons.codec.binary.Base64;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Service;
+
+import com.scholastic.srmapi.service.LtiService;
+import com.scholastic.srmapi.util.Constants;
+import com.scholastic.srmapi.util.Encoding;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+<span class="fc" id="L32">@Slf4j</span>
+@RequiredArgsConstructor
+public class LtiServiceImpl implements LtiService {
+    private static final String OAUTH_SIGNATURE = &quot;oauth_signature&quot;;
+    private static final String OAUTH_CONSUMER_KEY = &quot;oauth_consumer_key&quot;;
+    private static final String HMAC_SHA1 = &quot;HmacSHA1&quot;;
+<span class="fc" id="L38">    private static final String HTTP_POST_METHOD = HttpMethod.POST.toString();</span>
+    private static final String AMPERSAND = &quot;&amp;&quot;;
+
+    private final Environment env;
+
+    @Value(&quot;${serverRootUrl}&quot;)
+    private String srmWebRootUrl;
+
+    private final UserLoginSessionRepository userSessionRepository;
+
+    @Override
+    public boolean validateLtiRequest(HttpServletRequest request) {
+<span class="fc" id="L50">        var signature = request.getParameter(OAUTH_SIGNATURE);</span>
+<span class="fc" id="L51">        var requestParametersMap = getSortedRequestParametersMap(request);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        var ltiLaunchUrl = srmWebRootUrl + (srmWebRootUrl.endsWith(Constants.ROOT) ? &quot;lti&quot; : Constants.LTI);</span>
+        try {
+<span class="fc" id="L54">            return validateOAuthSignature(requestParametersMap, ltiLaunchUrl, signature);</span>
+<span class="nc" id="L55">        } catch (InvalidKeyException | NoSuchAlgorithmException | UnsupportedEncodingException e) {</span>
+<span class="nc" id="L56">            log.error(&quot;Error validating oauth signature: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L57">            return false;</span>
+        }
+    }
+
+    /**
+     * Creates a sorted key map and flattened version of a request's parameters
+     * 
+     * @param request the {@code HttpServletRequest} request
+     * @return a {@code SortedMap&lt;String, String&gt;} with keys sorted
+     */
+    private SortedMap&lt;String, String&gt; getSortedRequestParametersMap(HttpServletRequest request) {
+<span class="fc" id="L68">        var flatSortedRequestParametersMap = new TreeMap&lt;String, String&gt;(); // using TreeMap to ensure keys are sorted</span>
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (var entry : request.getParameterMap().entrySet()) {</span>
+<span class="fc" id="L71">            var key = entry.getKey();</span>
+<span class="fc" id="L72">            var values = entry.getValue();</span>
+
+            // ignore oauth signature key
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (!key.equals(OAUTH_SIGNATURE)) {</span>
+<span class="fc" id="L76">                var value = values[values.length - 1]; // flatten map by only using last value of array</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                if (value.indexOf('\r') &gt; -1) {</span>
+                    // remove carriage return characters
+<span class="fc" id="L79">                    value = value.replaceAll(&quot;(?:\\r)&quot;, &quot;&quot;);</span>
+                }
+<span class="fc" id="L81">                flatSortedRequestParametersMap.put(key, value);</span>
+            }
+<span class="fc" id="L83">        }</span>
+
+<span class="fc" id="L85">        return flatSortedRequestParametersMap;</span>
+    }
+
+    /**
+     * OAuth validation using parameters, launchUrl and signature
+     * 
+     * @param parametersMap the {@code SortedMap&lt;String, String&gt;} request parameters
+     *                      excluding oauth signature
+     * @param launchUrl     the url used for the LTI POST request
+     * @param signature     the signature to validate against
+     * @return {@code true} if successful oauth validation {@code false} otherwise
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     * @throws UnsupportedEncodingException
+     */
+    private boolean validateOAuthSignature(SortedMap&lt;String, String&gt; parametersMap, String launchUrl,
+            String signature) throws InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
+<span class="fc" id="L102">        var consumerKey = parametersMap.get(OAUTH_CONSUMER_KEY);</span>
+<span class="fc" id="L103">        var secret = Optional.ofNullable(env.getProperty(consumerKey)).orElse(&quot;&quot;);</span>
+<span class="fc" id="L104">        var signedSignature = sign(secret, launchUrl, parametersMap);</span>
+<span class="fc" id="L105">        var isValid = signature.equals(signedSignature);</span>
+
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (!isValid) {</span>
+<span class="fc" id="L108">            var signatureBaseString = getSignatureBaseString(HTTP_POST_METHOD, launchUrl, parametersMap);</span>
+<span class="fc" id="L109">            var errorResponse = new StringBuilder().append(&quot;**** Oauth Failed on lti launch\n&quot;)</span>
+<span class="fc" id="L110">                    .append(&quot;**** OauthConsumerKey They Sent: &quot; + consumerKey + &quot;\n&quot;)</span>
+<span class="fc" id="L111">                    .append(&quot;**** Local Secret configured for OauthConsumerKey: &quot; + secret + &quot;\n&quot;)</span>
+<span class="fc" id="L112">                    .append(&quot;**** Signature locally calculated: &quot; + signedSignature + &quot;\n&quot;)</span>
+<span class="fc" id="L113">                    .append(&quot;**** Signature SDM calculated: &quot; + signature + &quot;\n&quot;)</span>
+<span class="fc" id="L114">                    .append(&quot;**** URL used : &quot; + launchUrl + &quot;\n&quot;)</span>
+<span class="fc" id="L115">                    .append(&quot;**** Signature Base String used: &quot; + signatureBaseString + &quot;\n&quot;);</span>
+<span class="fc" id="L116">            log.error(errorResponse.toString());</span>
+        }
+
+<span class="fc" id="L119">        return isValid;</span>
+    }
+
+    /**
+     * Authentication using HMAC and signing of passed parameters using SHA1 hash
+     * function
+     * 
+     * @param secret     secret key to use
+     * @param url        url used to launch LTI POST request
+     * @param parameters {@code SortedMap&lt;String, String&gt;} of LTI request parameters
+     * @return signature {@code String}
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     * @throws UnsupportedEncodingException
+     */
+    private String sign(String secret, String url, SortedMap&lt;String, String&gt; parameters)
+            throws NoSuchAlgorithmException, InvalidKeyException, UnsupportedEncodingException {
+        // build secret key
+<span class="fc" id="L137">        var secretKey = secret.concat(AMPERSAND);</span>
+<span class="fc" id="L138">        var secretKeySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), HMAC_SHA1);</span>
+<span class="fc" id="L139">        var mac = Mac.getInstance(secretKeySpec.getAlgorithm());</span>
+<span class="fc" id="L140">        mac.init(secretKeySpec);</span>
+
+        // build message to hash
+<span class="fc" id="L143">        var signatureBaseString = getSignatureBaseString(HTTP_POST_METHOD, url, parameters);</span>
+<span class="fc" id="L144">        var hash = mac.doFinal(signatureBaseString.getBytes(StandardCharsets.UTF_8));</span>
+        // base64 encode hash
+<span class="fc" id="L146">        var encodedHash = Base64.encodeBase64(hash);</span>
+
+<span class="fc" id="L148">        return new String(encodedHash, StandardCharsets.UTF_8);</span>
+    }
+
+    /**
+     * Builds the LTI launch message to hash
+     * 
+     * @param method     HTTP method {@code String}
+     * @param url        the launch url
+     * @param parameters {@code SortedMap&lt;String, String&gt;} of the request parameters
+     * @return the message string to hash
+     * @throws UnsupportedEncodingException
+     */
+    private String getSignatureBaseString(String method, String url, SortedMap&lt;String, String&gt; parameters)
+            throws UnsupportedEncodingException {
+<span class="fc" id="L162">        var signatureBase = new StringBuilder().append(Encoding.percentEncode(method)).append(AMPERSAND)</span>
+<span class="fc" id="L163">                .append(Encoding.percentEncode(url)).append(AMPERSAND);</span>
+<span class="fc" id="L164">        var count = 0;</span>
+
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (var entry : parameters.entrySet()) {</span>
+<span class="fc" id="L167">            signatureBase.append(Encoding.percentEncode(Encoding.percentEncode(entry.getKey())))</span>
+<span class="fc" id="L168">                    .append(Encoding.urlEncode(&quot;=&quot;))</span>
+<span class="fc" id="L169">                    .append(Encoding.percentEncode(Encoding.percentEncode(entry.getValue())));</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (++count &lt; parameters.size()) {</span>
+<span class="fc" id="L171">                signatureBase.append(Encoding.urlEncode(AMPERSAND));</span>
+            }
+<span class="fc" id="L173">        }</span>
+
+<span class="fc" id="L175">        return signatureBase.toString();</span>
+    }
+
+    @Override
+    public Long createUserSession(String sourceId) {
+<span class="fc" id="L180">        var session = new UserLoginSession();</span>
+<span class="fc" id="L181">        session.setSourceId(Long.parseLong(sourceId));</span>
+<span class="fc" id="L182">        return userSessionRepository.save(session).getId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

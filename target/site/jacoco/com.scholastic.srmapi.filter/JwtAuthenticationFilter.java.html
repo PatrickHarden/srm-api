@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtAuthenticationFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.filter</a> &gt; <span class="el_source">JwtAuthenticationFilter.java</span></div><h1>JwtAuthenticationFilter.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.filter;
+
+import com.scholastic.srmapi.exception.UserNotAuthorizedException;
+import com.scholastic.srmapi.model.User;
+import com.scholastic.srmapi.util.Constants;
+import com.scholastic.srmapi.util.JwtTokenProvider;
+import io.micrometer.core.instrument.util.StringUtils;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Optional;
+
+/**
+ * Validates Jwt token and saves Claims to request.
+ */
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtTokenProvider jwtTokenProvider;
+
+    @Override
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">    protected void doFilterInternal(@NonNull HttpServletRequest request,</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                                    @NonNull HttpServletResponse response,</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                                    @NonNull FilterChain filterChain) throws IOException, ServletException {</span>
+        try {
+<span class="fc" id="L38">            String cookie = jwtTokenProvider.deriveJwtFromCookie(request);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (cookie != null) {</span>
+<span class="fc" id="L40">                var claims = Optional.of(jwtTokenProvider.translateJwtToClaims(cookie))</span>
+<span class="fc" id="L41">                        .filter(c -&gt; StringUtils.isNotBlank(c.getSubject()))</span>
+<span class="fc" id="L42">                        .filter(c -&gt; StringUtils.isNotBlank(c.get(Constants.SESSION_ID, String.class)))</span>
+<span class="fc" id="L43">                        .orElseThrow(() -&gt; new UserNotAuthorizedException(Constants.NOT_AUTHORIZED_MESSAGE));</span>
+
+<span class="fc" id="L45">                UsernamePasswordAuthenticationToken authenticationToken = Optional.of(claims.getSubject())</span>
+<span class="fc" id="L46">                        .map(Long::parseLong)</span>
+<span class="fc" id="L47">                        .map(id -&gt; {</span>
+<span class="fc" id="L48">                            var user = new User();</span>
+<span class="fc" id="L49">                            user.setSourceId(id);</span>
+<span class="fc" id="L50">                            user.setAuthorities(Collections.singletonList(&quot;ROLE_USER&quot;));</span>
+<span class="fc" id="L51">                             return new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());</span>
+<span class="pc" id="L52">                        }).orElseThrow(() -&gt; new UserNotAuthorizedException(Constants.NOT_AUTHORIZED_MESSAGE));</span>
+
+<span class="fc" id="L54">                SecurityContextHolder.getContext().setAuthentication(authenticationToken);</span>
+<span class="fc" id="L55">                request.setAttribute(Constants.CLAIMS, claims);</span>
+<span class="fc" id="L56">            } else {</span>
+<span class="fc" id="L57">                String uri = request.getRequestURI();</span>
+<span class="fc bfc" id="L58" title="All 6 branches covered.">                if (!uri.equals(&quot;/info&quot;) &amp;&amp; !uri.equals(&quot;/lti&quot;) &amp;&amp; !uri.equals(&quot;/health&quot;)) {</span>
+<span class="fc" id="L59">                    throw new UserNotAuthorizedException(Constants.NOT_AUTHORIZED_MESSAGE);</span>
+                }
+            }
+<span class="fc" id="L62">            filterChain.doFilter(request, response);</span>
+<span class="fc" id="L63">        } catch (UserNotAuthorizedException e) {</span>
+<span class="fc" id="L64">            response.setStatus(HttpStatus.UNAUTHORIZED.value());</span>
+<span class="fc" id="L65">            response.getWriter().write(e.getMessage());</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

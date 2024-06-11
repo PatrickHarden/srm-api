@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssessmentServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.service.support</a> &gt; <span class="el_source">AssessmentServiceImpl.java</span></div><h1>AssessmentServiceImpl.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.service.support;
+
+import com.scholastic.aa.api.enums.TestState;
+import com.scholastic.srmapi.exception.AssessmentException;
+import com.scholastic.srmapi.model.AssessmentTestDetails;
+import com.scholastic.srmapi.repository.AssessmentTestRepository;
+import com.scholastic.srmapi.response.Assessment;
+import com.scholastic.srmapi.response.SrmStatus;
+import com.scholastic.srmapi.service.AssessmentService;
+import com.scholastic.srmapi.util.Constants;
+import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Date;
+import java.util.Objects;
+
+<span class="fc" id="L23">@Slf4j</span>
+@Service
+@AllArgsConstructor
+public class AssessmentServiceImpl implements AssessmentService {
+
+<span class="fc" id="L28">    private static final List&lt;String&gt; CURRENT_ASSESSMENT_STATES = List.of(</span>
+<span class="fc" id="L29">            TestState.IN_PROGRESS.toString(), TestState.SUSPENDED.toString(), TestState.PRACTICE.toString());</span>
+
+    private final AssessmentTestRepository assessmentRepository;
+
+    private final BatchAssignmentServiceImpl batchAssignmentService;
+
+    @Override
+    public AssessmentTestDetails getCurrentAssessment(Long sourceId) {
+
+<span class="fc" id="L38">        List&lt;AssessmentTestDetails&gt; assessments = findAllCurrentAssessmentsBySource(sourceId);</span>
+<span class="fc bfc" id="L39" title="All 4 branches covered.">        if (assessments == null || assessments.isEmpty()) {</span>
+<span class="fc" id="L40">            throw new AssessmentException(HttpStatus.NOT_FOUND, Constants.NO_CURRENT_ASSESSMENTS_MESSAGE);</span>
+        }
+
+        // Check to make sure the test is still valid and not canceled by fetching the test from BAT
+<span class="fc" id="L44">        boolean srmCanceled = isSrmCanceled(sourceId);</span>
+
+        // If null, return NoCurrentAssessmentsException
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (srmCanceled</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                || !isAssessmentCurrent(assessments.get(0))</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                || !isAssessmentAvailable(assessments.get(0))) {</span>
+<span class="fc" id="L50">            throw new AssessmentException(HttpStatus.NOT_FOUND, Constants.NO_CURRENT_ASSESSMENTS_MESSAGE);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        } else if (assessments.size() &gt; 1) {</span>
+<span class="fc" id="L52">            log.error(&quot;Student with student id {} has {} current assessments&quot;, sourceId, assessments.size());</span>
+        }
+
+<span class="fc" id="L55">        return assessments.get(0);</span>
+    }
+
+    @Override
+    public void updateAssessmentSession(String sessionId, AssessmentTestDetails assessment) {
+<span class="fc" id="L60">        assessment.setUserLoginSessionId(Long.valueOf(sessionId));</span>
+<span class="fc" id="L61">        assessmentRepository.save(assessment);</span>
+<span class="fc" id="L62">    }</span>
+
+    public List&lt;AssessmentTestDetails&gt; findAllCurrentAssessmentsBySource(Long sourceId) {
+<span class="fc" id="L65">        return assessmentRepository.findCurrentBySourceIdAndTestStates(sourceId, CURRENT_ASSESSMENT_STATES);</span>
+    }
+
+    private boolean isSrmCanceled(Long sourceId) {
+<span class="fc" id="L69">        return Optional.ofNullable(batchAssignmentService.getStudentAssessment(sourceId).block()).stream()</span>
+<span class="fc" id="L70">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L71">                .map(Assessment::getSrmStatus)</span>
+<span class="fc" id="L72">                .map(SrmStatus::getStatus)</span>
+<span class="fc" id="L73">                .findFirst()</span>
+<span class="fc" id="L74">                .map(Constants.LEXILE_STATUS_CANCELED::equals)</span>
+<span class="fc" id="L75">                .orElse(false);</span>
+    }
+
+    private boolean isAssessmentCurrent(AssessmentTestDetails assessment) {
+<span class="fc" id="L79">        return Optional.of(assessment)</span>
+<span class="fc" id="L80">                .map(AssessmentTestDetails::getTestState)</span>
+<span class="fc" id="L81">                .map(Enum::toString)</span>
+<span class="fc" id="L82">                .filter(CURRENT_ASSESSMENT_STATES::contains)</span>
+<span class="fc" id="L83">                .isPresent();</span>
+    }
+
+    private boolean isAssessmentAvailable(AssessmentTestDetails assessment) {
+<span class="fc" id="L87">        return Optional.of(assessment)</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                .filter(a -&gt; a.getAssignedDate() != null)</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                .filter(a -&gt; a.getAssignedDate().compareTo(</span>
+<span class="fc" id="L90">                        Date.from(ZonedDateTime.now(ZoneId.of(&quot;UTC&quot;)).toInstant())) &lt;= 0)</span>
+<span class="fc" id="L91">                .isPresent();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

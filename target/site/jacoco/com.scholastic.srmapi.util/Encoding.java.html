@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Encoding.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.util</a> &gt; <span class="el_source">Encoding.java</span></div><h1>Encoding.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.util;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
+public final class Encoding {
+    // prevent instantiation
+    private Encoding() {
+    }
+
+    /**
+     * URL encodes value
+     * 
+     * @param value {@code String} to url encode
+     * @return the url encoded {@code String} of value
+     * @throws UnsupportedEncodingException
+     * @see {@link #percentEncode(String)}
+     */
+    public static String urlEncode(String value) throws UnsupportedEncodingException {
+<span class="fc" id="L21">        return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());</span>
+    }
+
+    /**
+     * Percent encodes value
+     * &lt;p&gt;
+     * Compared to {@link #urlEncode}, it also percent encodes the following
+     * characters: {@code +*~}
+     * &lt;/p&gt;
+     * 
+     * @param value {@code String} to percent encode
+     * @return the percent encoded {@code String} of value
+     * @throws UnsupportedEncodingException
+     * @see {@link #urlEncode(String)}
+     */
+    public static String percentEncode(String value) throws UnsupportedEncodingException {
+<span class="fc" id="L37">        return urlEncode(value).replace(&quot;+&quot;, &quot;%20&quot;).replace(&quot;*&quot;, &quot;%2A&quot;).replace(&quot;~&quot;, &quot;%7E&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

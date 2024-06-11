@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtTokenProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.util</a> &gt; <span class="el_source">JwtTokenProvider.java</span></div><h1>JwtTokenProvider.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.util;
+
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.Arrays;
+import java.util.Optional;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.impl.DefaultClaims;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import io.jsonwebtoken.security.Keys;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+
+<span class="fc" id="L22">@Slf4j</span>
+@Component
+public class JwtTokenProvider {
+    private static final String ISSUER = &quot;SRM&quot;;
+    private final String jwtSecret;
+
+<span class="fc" id="L28">    public JwtTokenProvider(@Value(&quot;${jwtSecret}&quot;) final String jwtSecret) {</span>
+<span class="fc" id="L29">        this.jwtSecret = jwtSecret;</span>
+<span class="fc" id="L30">    }</span>
+
+    /**
+     * Generates JWT
+     * 
+     * @param userId the user id
+     * @return jwt {@code String}
+     */
+    public String generateJwt(String userId, String sessionId) {
+<span class="fc" id="L39">        var now = Instant.now();</span>
+<span class="fc" id="L40">        var issuedAt = Date.from(now);</span>
+<span class="fc" id="L41">        var expiration = Date.from(now.plus(1, ChronoUnit.DAYS));</span>
+<span class="fc" id="L42">        var key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));</span>
+
+<span class="fc" id="L44">        return Jwts.builder()</span>
+<span class="fc" id="L45">                .setIssuer(ISSUER)</span>
+<span class="fc" id="L46">                .setSubject(userId)</span>
+<span class="fc" id="L47">                .setIssuedAt(issuedAt)</span>
+<span class="fc" id="L48">                .claim(Constants.SESSION_ID, sessionId)</span>
+<span class="fc" id="L49">                .setExpiration(expiration)</span>
+<span class="fc" id="L50">                .signWith(key)</span>
+<span class="fc" id="L51">                .compact();</span>
+    }
+
+    /**
+     * Translates a JWT from its Base64-encoded {@code String} into the subject of the JWT.
+     * @param cookie The Base64-encoded {@code String} cookie.
+     * @return The String representation of the subject.
+     */
+    public String translateJwtToSub(String cookie) {
+<span class="fc" id="L60">        return Optional.of(translateJwtToClaims(cookie))</span>
+<span class="fc" id="L61">                .map(Claims::getSubject)</span>
+<span class="fc" id="L62">                .orElse(null);</span>
+    }
+
+    /**
+     * Translates a JWT from its Base64-encoded {@code String} into Claims.
+     * @param cookie The Base64-encoded {@code String} cookie.
+     * @return A populated Claims object of the cookie.
+     */
+    public Claims translateJwtToClaims(String cookie) {
+<span class="fc bfc" id="L71" title="All 4 branches covered.">        if (cookie != null &amp;&amp; cookie.contains(&quot;.&quot;)) {</span>
+            try {
+<span class="fc" id="L73">                Key hmacKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));</span>
+
+<span class="fc" id="L75">                Jws&lt;Claims&gt; jwt = Jwts.parserBuilder()</span>
+<span class="fc" id="L76">                        .setSigningKey(hmacKey)</span>
+<span class="fc" id="L77">                        .build()</span>
+<span class="fc" id="L78">                        .parseClaimsJws(cookie);</span>
+<span class="fc" id="L79">                return Optional.ofNullable(jwt)</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                        .filter(j -&gt; j.getBody() != null)</span>
+<span class="fc" id="L81">                        .map(Jwt::getBody)</span>
+<span class="fc" id="L82">                        .orElse(null);</span>
+<span class="fc" id="L83">            } catch (ClassCastException | MalformedJwtException e) {</span>
+<span class="fc" id="L84">                log.warn(&quot;Cookie was rejected: &quot; + e);</span>
+<span class="fc" id="L85">                throw new JwtException(Constants.MISSING_SESSION_INFORMATION_MESSAGE);</span>
+            }
+        }
+<span class="fc" id="L88">        return new DefaultClaims();</span>
+    }
+
+    /**
+     * Verifies the JWT is valid, then pulls the source ID from the JWT.
+     * @param req The HttpServletRequest made to the server.
+     */
+    public Long verifySessionAndReturnSourceId(HttpServletRequest req) {
+<span class="fc" id="L96">        String jwt = deriveJwtFromCookie(req);</span>
+
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (jwt != null) {</span>
+<span class="fc" id="L99">            String sourceId = translateJwtToSub(jwt);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (sourceId != null) {</span>
+                try {
+<span class="fc" id="L102">                    return Long.parseLong(sourceId);</span>
+<span class="fc" id="L103">                } catch (NumberFormatException e) {</span>
+<span class="fc" id="L104">                    log.info(&quot;Source was not a valid Long ID: &quot; + sourceId);</span>
+                }
+            }
+        }
+
+<span class="fc" id="L109">        throw new JwtException(Constants.MISSING_SESSION_INFORMATION_MESSAGE);</span>
+    }
+
+    /**
+     * Derives the JWT token from a given servlet request
+     * @param request the request to be parsed
+     * @return the JWT token in String form.
+     */
+    public String deriveJwtFromCookie(HttpServletRequest request) {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (request.getCookies() != null) {</span>
+<span class="fc" id="L119">            return Arrays.stream(request.getCookies())</span>
+<span class="fc" id="L120">                    .filter(cookie -&gt; Constants.LITPLAT_JWT.equals(cookie.getName()))</span>
+<span class="fc" id="L121">                    .map(Cookie::getValue)</span>
+<span class="fc" id="L122">                    .findFirst().orElse(null);</span>
+        }
+<span class="fc" id="L124">        return null;</span>
+    }
+
+    /**
+     * Validates equality between populated Claims and student ID.
+     * @param claims Claims from JWT.
+     * @param id student ID.
+     * @return if the two params equal.
+     */
+    public static boolean validateClaimsMatchStudentId(Claims claims, String id) {
+<span class="pc bpc" id="L134" title="2 of 8 branches missed.">        if (id != null &amp;&amp; validateIdIsValid(id) &amp;&amp; claims != null &amp;&amp; !claims.isEmpty() ) {</span>
+<span class="fc" id="L135">            return id.equals(claims.getSubject());</span>
+        }
+<span class="fc" id="L137">        return false;</span>
+    }
+
+    /**
+     * Validates equality between populated Claims and student ID.
+     * @param claims Claims from JWT.
+     * @return The Long ID of the session associated to the JWT
+     */
+    public static Long deriveSessionIdFromClaims(Claims claims) {
+<span class="fc" id="L146">        return Optional.ofNullable(claims)</span>
+<span class="fc" id="L147">                .map(c -&gt; c.get(Constants.SESSION_ID))</span>
+<span class="fc" id="L148">                .map(Object::toString)</span>
+<span class="fc" id="L149">                .filter(JwtTokenProvider::validateIdIsValid)</span>
+<span class="fc" id="L150">                .map(Long::parseLong)</span>
+<span class="fc" id="L151">                .orElse(null);</span>
+    }
+
+    /**
+     * Validates that an ID is a valid source or session Long string greater than 0.
+     * @param id The ID to be checked
+     * @return true if the ID can be parsed and is greater than 0.
+     */
+    public static boolean validateIdIsValid(String id) {
+        try {
+<span class="fc" id="L161">            Long.parseLong(id);</span>
+<span class="fc" id="L162">        } catch (Exception e) {</span>
+<span class="fc" id="L163">            return false;</span>
+<span class="fc" id="L164">        }</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        return Long.parseLong(id) &gt; 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

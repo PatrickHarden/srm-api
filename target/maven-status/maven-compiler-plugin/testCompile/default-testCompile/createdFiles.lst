@@ -1,0 +1,15 @@
+com/scholastic/srmapi/controller/advice/ExceptionHandlerAdviceTest.class
+com/scholastic/srmapi/service/support/LtiServiceImplTest.class
+com/scholastic/srmapi/controller/HelloWorldControllerTest.class
+com/scholastic/srmapi/controller/AssessmentControllerTest.class
+com/scholastic/srmapi/helper/AssessmentBuilderHelper.class
+com/scholastic/srmapi/response/AssessmentTestResponseTest.class
+com/scholastic/srmapi/service/support/AssessmentServiceImplTest.class
+com/scholastic/srmapi/config/BaWebClientConfigTest.class
+com/scholastic/srmapi/controller/LTILaunchControllerTest.class
+com/scholastic/srmapi/filter/JwtAuthenticationFilterTest.class
+com/scholastic/srmapi/interceptor/AssessmentControllerInterceptorTest.class
+com/scholastic/srmapi/service/support/BatchAssignmentServiceImplTest.class
+com/scholastic/srmapi/util/JwtTokenProviderTest.class
+com/scholastic/srmapi/util/AssessmentHelperTest.class
+com/scholastic/srmapi/helper/JwtHelper.class

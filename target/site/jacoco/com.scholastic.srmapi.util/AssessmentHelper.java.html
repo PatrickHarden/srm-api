@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssessmentHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.util</a> &gt; <span class="el_source">AssessmentHelper.java</span></div><h1>AssessmentHelper.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.util;
+
+import com.scholastic.srmapi.model.AssessmentIssuedQuestion;
+import com.scholastic.srmapi.model.AssessmentTestDetails;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.Date;
+import java.util.Optional;
+
+/**
+ * Static Helper for common assessment methods.
+ */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class AssessmentHelper {
+
+    /**
+     * Retrieves the currently assigned question for the provided {@code AssessmentTestDetails} test.
+     * @param assessmentTestDetails The {@code AssessmentTestDetails} for a provided assessment.
+     * @return The currently assigned question.
+     */
+    public static AssessmentIssuedQuestion getCurrentQuestionForAssessment(AssessmentTestDetails assessmentTestDetails) {
+<span class="fc" id="L25">        int currentQuestion = assessmentTestDetails.getCurrentQuestion();</span>
+<span class="fc" id="L26">        return Optional.of(assessmentTestDetails).stream()</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">                .filter(test -&gt; test.getCurrentQuestion() &gt;= 1)</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">                .filter(test -&gt; test.getIssuedQuestions() != null)</span>
+<span class="fc" id="L29">                .flatMap(test -&gt; test.getIssuedQuestions().stream())</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                .filter(question -&gt; currentQuestion == question.getQuestionSeq())</span>
+<span class="fc" id="L31">                .findFirst().orElse(null);</span>
+    }
+
+    /**
+     * Converts a given {@code int} into its equivalent {@code String} Lexile format.
+     * @param lexile The {@code int} to convert to Lexile format.
+     * @return The properly-formatted Lexile.
+     */
+    public static String intToLexile(int lexile) {
+        String formattedLexile;
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (lexile &gt;= 0) {</span>
+<span class="fc" id="L42">            formattedLexile = lexile + &quot;L&quot;;</span>
+        } else {
+<span class="fc" id="L44">            formattedLexile = &quot;BR&quot; + Math.abs(lexile) + &quot;L&quot;;</span>
+        }
+<span class="fc" id="L46">        return formattedLexile;</span>
+    }
+
+    /**
+     * Gets current date time
+     * @return current date
+     */
+    public static Date getCurrentDateTime() {
+<span class="nc" id="L54">        return Date.from(ZonedDateTime.now(ZoneId.of(&quot;UTC&quot;)).toInstant());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

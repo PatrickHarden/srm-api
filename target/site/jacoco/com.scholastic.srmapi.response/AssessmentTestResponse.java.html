@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssessmentTestResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.response</a> &gt; <span class="el_source">AssessmentTestResponse.java</span></div><h1>AssessmentTestResponse.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.response;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.scholastic.aa.api.enums.TestState;
+import com.scholastic.srmapi.config.EnvironmentConfig;
+import com.scholastic.srmapi.model.AssessmentQuestion;
+import com.scholastic.srmapi.model.AssessmentTestDetails;
+import com.scholastic.srmapi.util.AssessmentHelper;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+
+import static com.scholastic.srmapi.util.Constants.SHUFFLE_ASSESSMENT_ANSWERS;
+import static com.scholastic.srmapi.util.Constants.ZERO;
+import static com.scholastic.srmapi.util.Constants.ONE;
+import static com.scholastic.srmapi.util.Constants.TWO;
+import static com.scholastic.srmapi.util.Constants.THREE;
+
+/**
+ * Represents the single, most current SRM assessment for the current user.
+ */
+<span class="fc" id="L27">@Slf4j</span>
+@Getter
+@Builder
+public class AssessmentTestResponse {
+    private Long id;
+    private Long studentId;
+    private String testState;
+    private String testType;
+    private Integer numberSkipsTaken;
+    private int numberSkipsPossible;
+    private Integer practiceQuestionsTaken;
+    private int practiceQuestionsPossible;
+    private int currentAssessmentQuestion;
+    private int lexile;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = &quot;yyyy-MM-dd'T'HH:00:000Z&quot;, timezone = &quot;America/New_York&quot;)
+    private Date dateAssigned;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = &quot;yyyy-MM-dd'T'HH:00:000Z&quot;, timezone = &quot;America/New_York&quot;)
+    private Date dateStarted;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = &quot;yyyy-MM-dd'T'HH:00:000Z&quot;, timezone = &quot;America/New_York&quot;)
+    private Date dateLastActivity;
+    private AssessmentQuestionResponse question;
+
+    /**
+     * Returns the current assessment Lexile, formatted as nL or BRnL, where 'n' is a positive integer.
+     * @return The {@code String} representation of the current assessment Lexile.
+     */
+    public String getLexileFormatted() {
+<span class="fc" id="L54">        return AssessmentHelper.intToLexile(this.getLexile());</span>
+    }
+
+    /**
+     * Builds an {@code AssessmentTestResponse} which will contain the status and question of a current test.
+     * @param assessment The student test details represented as the model {@code AssessmentTestDetails}
+     * @return A populated {@code AssessmentTestResponse} which reflects the student's test details.
+     */
+    public static AssessmentTestResponse buildAssessmentResponse(AssessmentTestDetails assessment) {
+<span class="fc" id="L63">        AssessmentTestResponse.AssessmentTestResponseBuilder builder = AssessmentTestResponse.builder();</span>
+
+<span class="fc" id="L65">        builder.id(assessment.getId())</span>
+<span class="fc" id="L66">                .studentId(assessment.getSourceId())</span>
+<span class="fc" id="L67">                .numberSkipsPossible(assessment.getNumberSkipsPossible())</span>
+<span class="fc" id="L68">                .currentAssessmentQuestion(assessment.getCurrentQuestion())</span>
+<span class="fc" id="L69">                .practiceQuestionsPossible(assessment.getPracticeQuestionsPossible())</span>
+<span class="fc" id="L70">                .lexile(assessment.getEndLexile())</span>
+<span class="fc" id="L71">                .dateStarted(assessment.getCreatedDate());</span>
+
+
+        // Optional fields
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (assessment.getAssignedDate() != null) {</span>
+<span class="fc" id="L76">            builder.dateAssigned(assessment.getAssignedDate());</span>
+        }
+
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (assessment.getPracticeQuestionsTaken() != null) {</span>
+<span class="fc" id="L80">            builder.practiceQuestionsTaken(assessment.getPracticeQuestionsTaken());</span>
+        }
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (assessment.getNumberSkipsTaken() != null) {</span>
+<span class="fc" id="L84">            builder.numberSkipsTaken(assessment.getNumberSkipsTaken());</span>
+        }
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (assessment.getTestState() != null) {</span>
+<span class="fc" id="L88">            builder.testState(assessment.getTestState().name());</span>
+        }
+
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (assessment.getTestType() != null) {</span>
+<span class="fc" id="L92">            builder.testType(assessment.getTestType().name());</span>
+        }
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (assessment.getModifiedDate() != null) {</span>
+<span class="fc" id="L96">            builder.dateLastActivity(assessment.getModifiedDate());</span>
+        }
+
+        // If the assessment is not finished, build question
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (!TestState.FINISHED.equals(assessment.getTestState())) {</span>
+
+            // Fetch question logic
+<span class="fc" id="L103">            var currentQuestion = AssessmentHelper.getCurrentQuestionForAssessment(assessment);</span>
+<span class="fc" id="L104">            var assessmentQuestion = currentQuestion.getAssessmentQuestion();</span>
+<span class="fc" id="L105">            int actualAnswerDisplay = currentQuestion.getCorrectAnsDisplay();</span>
+<span class="fc" id="L106">            builder.question(buildAssessmentQuestionResponse(assessmentQuestion, actualAnswerDisplay));</span>
+        }
+
+<span class="fc" id="L109">        return builder.build();</span>
+    }
+
+    private static AssessmentQuestionResponse buildAssessmentQuestionResponse(AssessmentQuestion aq, int answerDisplayIndex) {
+<span class="fc" id="L113">        AssessmentQuestionResponse.AssessmentQuestionResponseBuilder aqrBuilder = AssessmentQuestionResponse.builder();</span>
+<span class="fc" id="L114">        aqrBuilder.id(aq.getId());</span>
+<span class="fc" id="L115">        aqrBuilder.fillInBlank(aq.getQuestion());</span>
+<span class="fc" id="L116">        aqrBuilder.passage(aq.getPassage());</span>
+<span class="fc" id="L117">        aqrBuilder.sourceId(aq.getSourceId());</span>
+<span class="fc" id="L118">        aqrBuilder.lexile(aq.getLexile());</span>
+
+<span class="fc" id="L120">        List&lt;AssessmentAnswerResponse&gt; answerList = Arrays.asList(</span>
+<span class="fc" id="L121">                new AssessmentAnswerResponse(answerDisplayIndex, aq.getAnswerCorrect()),</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                new AssessmentAnswerResponse(answerDisplayIndex == ONE ? ZERO : ONE, aq.getAnswer2()),</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                new AssessmentAnswerResponse(answerDisplayIndex == TWO ? ZERO : TWO, aq.getAnswer3()),</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                new AssessmentAnswerResponse(answerDisplayIndex == THREE ? ZERO : THREE, aq.getAnswer4())</span>
+        );
+
+        // Pull system properties to verify if the assessment has been properly shuffled.
+<span class="fc" id="L128">        String shuffleAssessmentAnswers = EnvironmentConfig.getSystemVar(SHUFFLE_ASSESSMENT_ANSWERS);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (!&quot;false&quot;.equalsIgnoreCase(shuffleAssessmentAnswers)) {</span>
+            // Shuffle (default behavior)
+<span class="fc" id="L131">            Collections.shuffle(answerList);</span>
+        } else {
+<span class="fc" id="L133">            log.debug(&quot;shuffleAssessmentAnswers is set to false, not randomizing questions&quot;);</span>
+        }
+<span class="fc" id="L135">        aqrBuilder.answers(answerList);</span>
+<span class="fc" id="L136">        return aqrBuilder.build();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

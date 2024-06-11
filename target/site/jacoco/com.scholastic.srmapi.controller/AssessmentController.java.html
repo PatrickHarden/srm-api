@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssessmentController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">srm-api</a> &gt; <a href="index.source.html" class="el_package">com.scholastic.srmapi.controller</a> &gt; <span class="el_source">AssessmentController.java</span></div><h1>AssessmentController.java</h1><pre class="source lang-java linenums">package com.scholastic.srmapi.controller;
+
+import com.scholastic.srmapi.exception.UserNotAuthorizedException;
+import com.scholastic.srmapi.model.AssessmentTestDetails;
+import com.scholastic.srmapi.response.Assessment;
+import com.scholastic.srmapi.response.AssessmentTestResponse;
+import com.scholastic.srmapi.service.AssessmentService;
+import com.scholastic.srmapi.service.BatchAssignmentService;
+import com.scholastic.srmapi.util.Constants;
+import com.scholastic.srmapi.util.JwtTokenProvider;
+import io.jsonwebtoken.Claims;
+import lombok.AllArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+
+import java.util.Optional;
+
+@RestController
+@RequestMapping(&quot;/api/v1/assessment&quot;)
+@AllArgsConstructor
+public class AssessmentController {
+
+    private BatchAssignmentService batchAssignmentService;
+
+    private AssessmentService assessmentService;
+
+
+    /**
+     *
+     * @param studentId Long representation of a student's ID
+     * @return Assessment details about assigned assessments
+     */
+    @GetMapping( &quot;/{studentId}&quot;)
+    public Mono&lt;Assessment&gt; getStudentAssessment(@PathVariable(&quot;studentId&quot;) Long studentId) {
+<span class="fc" id="L36">        return batchAssignmentService.getStudentAssessment(studentId);</span>
+    }
+
+    /**
+     * Gets the current assessment for a student, referencing the source ID from the JWT.
+     * @param studentId Long representation of a student's ID
+     * @param claims The {@code Claims} of the incoming request.
+     * @return The {@code ResponseEntity} containing the requested {@code AssessmentTestResponse}
+     */
+    @GetMapping(value = &quot;/{studentId}/current&quot;)
+    public ResponseEntity&lt;AssessmentTestResponse&gt; getCurrentAssessment(
+            @PathVariable(&quot;studentId&quot;) Long studentId,
+            @RequestAttribute(Constants.CLAIMS) Claims claims) {
+        // Retrieve current assessment
+<span class="fc" id="L50">        AssessmentTestDetails assessment = assessmentService.getCurrentAssessment(studentId);</span>
+
+        // Associate current user session to newest question.
+<span class="fc" id="L53">        Long sessionId = Optional.ofNullable(JwtTokenProvider.deriveSessionIdFromClaims(claims))</span>
+<span class="fc" id="L54">                .orElseThrow(() -&gt; new UserNotAuthorizedException(Constants.MISSING_SESSION_INFORMATION_MESSAGE));</span>
+<span class="fc" id="L55">        assessmentService.updateAssessmentSession(sessionId.toString(), assessment);</span>
+
+        // Return assessment response
+<span class="fc" id="L58">        return ResponseEntity.ok(AssessmentTestResponse.buildAssessmentResponse(assessment));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
